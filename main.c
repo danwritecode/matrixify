@@ -14,7 +14,7 @@ void RenderBooting(Image *image, int offset, int render_rate);
 void ImageQuantizeEuclidean(Image *image);
 void ImageQuantizeManhattan(Image *image);
 void ImagePixelate(Image *image, int pixel_size);
-Point GetPointFromPixel(int pixel, int width);
+Point GetPointFromIndex(int pixel, int width);
 int GetIndexFromPoint(Point point, int width);
 
 const int SCREEN_WIDTH = 800;
@@ -76,7 +76,7 @@ void RenderOldTv(Image *image, int offset) {
 
 	    for (int i = 0; i < 100000; i++) {
 		int p = rand() % (0 + (image->width * image->height));
-		Point xy = GetPointFromPixel(p, image->width);
+		Point xy = GetPointFromIndex(p, image->width);
 		Color color = { pixels[p].r, pixels[p].g, pixels[p].b, pixels[p].a };
 		DrawPixel(xy.x+offset, xy.y+offset, color);
 	    }
@@ -92,7 +92,7 @@ void RenderBooting(Image *image, int offset, int render_rate) {
 	BeginDrawing();
 	    for (int i = 0; i < rendered; i++) {
 		int p = rand() % (0 + (image->width * image->height));
-		Point xy = GetPointFromPixel(p, image->width);
+		Point xy = GetPointFromIndex(p, image->width);
 		Color color = { pixels[p].r, pixels[p].g, pixels[p].b, pixels[p].a };
 		DrawPixel(xy.x+offset, xy.y+offset, color);
 	    }
@@ -229,7 +229,7 @@ void ImagePixelate(Image *image, int pixel_size) {
     int width = image->width / pixel_lh;
 
     for (int b = 0; b < (width * height); b++) {
-	Point point = GetPointFromPixel(b, width);
+	Point point = GetPointFromIndex(b, width);
 	
 	// find original pixel index
 	int og_x = point.x * pixel_lh;
@@ -279,7 +279,7 @@ void ImagePixelate(Image *image, int pixel_size) {
     ImageFormat(image, image->format);
 }
 
-Point GetPointFromPixel(int pixel, int width) {
+Point GetPointFromIndex(int pixel, int width) {
     Point point;
     point.x = pixel % width;
     point.y = (int)floor((float)pixel / width);
