@@ -14,8 +14,10 @@ void RenderBooting(Image *image, int offset, int render_rate);
 void ImageQuantizeEuclidean(Image *image);
 void ImageQuantizeManhattan(Image *image);
 void ImagePixelate(Image *image, int pixel_size);
+void ImagePixelateRetainPixelCt(Image *image, int pixel_size);
 Point GetPointFromIndex(int pixel, int width);
 int GetIndexFromPoint(Point point, int width);
+Image ImageResizeNearestNeighbor(Image image, int newWidth, int newHeight);
 
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 800;
@@ -38,15 +40,17 @@ int main() {
     Image image = LoadImage("./goku.png");
     ImageResize(&image, 400, 600);
 
-    ImagePixelate(&image, 16);
     ImageQuantizeManhattan(&image);
+    ImagePixelate(&image, 49);
+
+    Image new_image = ImageResizeNearestNeighbor(image, 400, 600);
 
     SetTargetFPS(60);
     int offset = 100;
 
-    // RenderBooting(&image, offset, 100);
+    // RenderBooting(&new_image, offset, 1);
     // RenderOldTv(&image, offset);
-    RenderStandard(&image, offset);
+    RenderStandard(&new_image, offset);
 
     CloseWindow();
     return 0;
@@ -220,6 +224,62 @@ void ImageQuantizeManhattan(Image *image) {
 
 /// Pixel Size must be square rootable with no remainder
 void ImagePixelate(Image *image, int pixel_size) {
+    ImageAlphaPremultiply(image);
+    Color *pixels = LoadImageColors(*image);
+
+    int pixel_lh = sqrt(pixel_size);
+    int height = image->height / pixel_lh;
+    int width = image->width / pixel_lh;
+
+    Image new_image = GenImageColor(width, height, BLANK);
+    Color *new_pixels = LoadImageColors(new_image);
+
+    for (int p = 0; p < (width * height); p++) {
+	Point point = GetPointFromIndex(p, width);
+	
+	// find original pixel index
+	int og_x = point.x * pixel_lh;
+	int og_y = point.y * pixel_lh;
+	Color block_pixels[pixel_size];
+
+	for (int x = 0; x < pixel_lh; x++) {
+	    for (int y = 0; y < pixel_lh; y++) {
+		Point point = {x + og_x, y + og_y};
+		int pixel_idx = GetIndexFromPoint(point, image->width);
+
+		Point block_point = {x, y};
+		int block_idx = GetIndexFromPoint(block_point, pixel_lh);
+
+		block_pixels[block_idx] = pixels[pixel_idx];
+	    }
+	}
+
+
+	int r = 0, g = 0, b = 0, a = 0;
+	for (int i = 0; i < pixel_size; i++) {
+	    r += block_pixels[i].r;
+	    g += block_pixels[i].g;
+	    b += block_pixels[i].b;
+	    a += block_pixels[i].a;
+	}
+
+	Color block_rbga = {r / pixel_size, g / pixel_size, b / pixel_size , a / pixel_size};
+	new_pixels[p] = block_rbga;
+    }
+
+    UnloadImageColors(pixels);
+    free(image->data);
+
+    image->data = new_pixels;
+    image->height = height;
+    image->width = width;
+    image->format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+
+    ImageFormat(image, image->format);
+}
+
+/// Pixel Size must be square rootable with no remainder
+void ImagePixelateRetainPixelCt(Image *image, int pixel_size) {
     if ((image->data == NULL) || (image->width == 0) || (image->height == 0)) return;
 
     ImageAlphaPremultiply(image);
@@ -289,4 +349,27 @@ Point GetPointFromIndex(int pixel, int width) {
 
 int GetIndexFromPoint(Point point, int width) {
     return point.y * width + point.x;
+}
+
+Image ImageResizeNearestNeighbor(Image image, int newWidth, int newHeight) {
+    Image new_image = GenImageColor(newWidth, newHeight, BLANK);
+    Color *new_pixels = LoadImageColors(new_image);
+    Color *pixels = LoadImageColors(image);
+
+    int x_ratio = (image.width << 16) / newWidth + 1;
+    int y_ratio = (image.height << 16) / newHeight + 1;
+
+    for (int i = 0; i < newHeight; i++) {
+        for (int j = 0; j < newWidth; j++) {
+            int x = ((j * x_ratio) >> 16);
+            int y = ((i * y_ratio) >> 16);
+            new_pixels[i * newWidth + j] = pixels[y * image.width + x];
+        }
+    }
+
+    UnloadImageColors(pixels);
+    free(new_image.data);
+    new_image.data = (unsigned char *)new_pixels;
+
+    return new_image;
 }
